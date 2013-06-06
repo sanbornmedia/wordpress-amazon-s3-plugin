@@ -26,17 +26,16 @@ function s3_stream_handle_file_upload($file) {
 	$upload_path = empty($upload_path) ? 'uploads' : $upload_path;
 	$filePathSplit = split($upload_path, $file['file']);
 
-	//$filePathInfo = pathinfo($file['file']);
-	//$upload_dir = trailingslashit(str_ireplace(dirname($_SERVER["SCRIPT_NAME"]), '', $filePathInfo['dirname']));
-
-	// Upload the file to S3
-    // $s3 = new Zend_Service_Amazon_S3(S3_STREAM_ACCESS_KEY, S3_STREAM_SECRET);
     $s3 = new S3(S3_STREAM_ACCESS_KEY, S3_STREAM_SECRET);
     $s3Path = S3_STREAM_PATH . $filePathSplit[1];
     $uploadSuccess = $s3->putObject($s3->inputFile($file['file'], false), S3_STREAM_BUCKET_NAME, $s3Path, S3::ACL_PUBLIC_READ);
+
+	$cdn_path = trailingslashit(S3_STREAM_URL) . S3_STREAM_PATH;
+
     if ($uploadSuccess) {
-    	$file['url'] = 'http://s3.amazonaws.com/' . $s3Path;
-    	// Remove file from FileSystem
+    	$file['url'] = $cdn_path . $filePathSplit[1];
+    } else {
+    	throw new Exception("Could not upload file to s3");
     }
     
 	return $file;
@@ -70,7 +69,8 @@ function s3_stream_get_attachment_url($url) {
 		$upload_dir = 'wp-content/uploads';
 	if (strripos($url, "amazonaws.com") !== false)
 		return $url;
-	$newUrl = str_ireplace(get_site_url(), 'http://s3.amazonaws.com/' . S3_STREAM_BUCKET_NAME , $url);
+
+	$newUrl = str_ireplace(get_site_url(), S3_STREAM_URL, $url);
 	$newUrl = str_ireplace($upload_dir, S3_STREAM_PATH, $newUrl);
 	return $newUrl;
 }
@@ -85,6 +85,8 @@ if (! ( defined('S3_STREAM_ACCESS_KEY') ) ):
 	define("S3_STREAM_ACCESS_KEY", $options['key']);
 	define("S3_STREAM_SECRET", $options['secret']);
 
+	$cdn_url = !empty($options['cdn_url']) ? $options['cdn_url'] : 'http://s3.amazonaws.com/' . S3_STREAM_BUCKET_NAME;
+	define("S3_STREAM_URL", $cdn_url);
 
 	//// Settings Page - AMD 10/2012 ////
 
@@ -112,6 +114,9 @@ if (! ( defined('S3_STREAM_ACCESS_KEY') ) ):
 	            <table class="form-table">
 	                <tr valign="top"><th scope="row">Bucket <em>my_awesome_bucket</em></th>
 	                    <td><input type="text" name="amazon_s3_stream_setting[bucket]" value="<?php echo $options['bucket']; ?>" /></td>
+	                </tr>
+	                <tr valign="top"><th scope="row">CDN URL <em>http://laksdfjasdlfkj.cloudfront.net</em></th>
+	                    <td><input type="text" name="amazon_s3_stream_setting[cdn_url]" value="<?php echo $options['cdn_url']; ?>" /></td>
 	                </tr>
 	                   <tr valign="top"><th scope="row">Path <em>cool/folder/for/pics</em></th>
 	                    <td><input type="text" name="amazon_s3_stream_setting[path]" value="<?php echo $options['path']; ?>" /></td>
